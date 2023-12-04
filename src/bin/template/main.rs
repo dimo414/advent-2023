@@ -4,8 +4,8 @@
 
 use std::str::FromStr;
 use anyhow::*;
+use lazy_regex::regex_captures;
 
-use advent_2023::parsing::*;
 use advent_2023::collect::{MoreIntoIterator,MoreItertools};
 
 fn main() -> Result<()> {
@@ -24,9 +24,8 @@ impl FromStr for Obj {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let regex = static_regex!(r"Hello (.*)!");
-        let caps = regex_captures(regex, s)?;
-        Ok(Obj{ str: capture_group(&caps, 1).to_string() })
+        let (_, str) = regex_captures!(r"Hello (.*)!", s).with_context(|| format!("Invalid: {}", s))?;
+        Ok(Obj{ str: str.to_string() })
     }
 }
 

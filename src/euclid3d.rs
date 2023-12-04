@@ -6,9 +6,8 @@ use std::fmt;
 use std::ops::{Add,AddAssign,Sub};
 use std::str::FromStr;
 use std::cmp;
-use anyhow::{Error,Result};
-
-use crate::parsing::{capture_group,regex_captures,static_regex};
+use anyhow::{Context, Error, Result};
+use lazy_regex::regex_captures;
 
 mod point {
     use super::*;
@@ -111,11 +110,11 @@ mod point {
 
         fn from_str(s: &str) -> Result<Self> {
             // r"^([^,]+),([^,]+)$" would be more strict - worth it?
-            let re = static_regex!(r"^\(?([^(,]+),([^),]+),([^),]+)\)?$");
-            let caps = regex_captures(re, s)?;
-            let x: i32 = capture_group(&caps, 1).trim().parse()?;
-            let y: i32 = capture_group(&caps, 2).trim().parse()?;
-            let z: i32 = capture_group(&caps, 3).trim().parse()?;
+            let (_, x, y, z) = regex_captures!(r"^\(?([^(,]+),([^),]+),([^),]+)\)?$", s)
+                .with_context(|| format!("Invalid point '{}'", s))?;
+            let x: i32 = x.trim().parse()?;
+            let y: i32 = y.trim().parse()?;
+            let z: i32 = z.trim().parse()?;
             Ok(point(x, y, z))
         }
     }
