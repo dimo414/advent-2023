@@ -199,7 +199,8 @@ mod vector {
         }
 
         pub fn len(&self) -> f64 {
-            unimplemented!()
+            let xy_hypot = (self.x as f64).hypot(self.y as f64);
+            xy_hypot.hypot(self.z as f64)
         }
 
         pub fn grid_len(&self) -> u32 {
@@ -233,11 +234,24 @@ mod vector {
     mod tests {
         use super::super::point;
         use super::*;
+        use assert_approx_eq::assert_approx_eq;
 
         #[test]
         fn parse() {
             assert_eq!("3, 4, 5".parse::<Vector>().unwrap(), vector(3, 4, 5));
             assert_eq!("-3,-4,-5".parse::<Vector>().unwrap(), vector(-3, -4, -5));
+        }
+
+        parameterized_test::create!{ lens, (p1, p2, d), {
+            assert_approx_eq!((p1 - p2).len(), d, f64::EPSILON);
+            assert_approx_eq!((p2 - p1).len(), d, f64::EPSILON);
+        }}
+        lens! {
+            a: (point(1,1,1), point(1,1,1), 0.0),
+            b: (point(1,1,1), point(1,2,1), 1.0),
+            c: (point(1,1,1), point(2,2,2), 1.7320508075688774),
+            d: (point(1,1,1), point(8,3,5), 8.306623862918075),
+            e: (point(1,1,1), point(-1,-1,-1), 3.464101615137755),
         }
 
         parameterized_test::create!{ grid_lens, (p1, p2, d), {
