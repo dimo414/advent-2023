@@ -30,7 +30,7 @@ impl FromStr for Tiles {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let mut hand = Tiles {red:0, green:0, blue:0};
         for part in s.split(", ") {
-            let cube = part.split(" ").collect::<Vec<_>>();
+            let cube = part.split(' ').collect::<Vec<_>>();
             ensure!(cube.len() == 2, "{}", part);
             let num: u32 = cube[0].parse()?;
             match cube[1] {

@@ -325,7 +325,8 @@ mod tests {
         fn neighbors(&self, source: &Self::Node) -> Vec<Edge<Self::Node>> {
             if self.blocked.contains(source) { return vec!(); }
 
-            vec!(vector(0, 1), vector(1, 0), vector(0, -1), vector(-1, 0)).iter()
+            [vector(0, 1), vector(1, 0), vector(0, -1), vector(-1, 0)]
+                .into_iter()
                 .map(|v| source + v)
                 .filter(|p| !self.blocked.contains(p))
                 .map(|d| Edge::new(1, *source, d))
@@ -398,10 +399,10 @@ mod tests {
         let bfs_routes_lens: BTreeMap<_,_> = bfs_routes.iter().map(|(&k, v)| (k, v.len() as i32 - 1)).collect();
         let djk_routes_lens: BTreeMap<_,_> = djk_routes.iter()
             .map(|(&k, v)| (k, v.iter().map(|e| e.weight()).sum())).collect();
-        let expected_routes: BTreeMap<_,_> = vec!(
+        let expected_routes: BTreeMap<_,_> = [
             (point(1, 1), 3), (point(2, 1), 4), (point(1, 2), 2), (point(3, 2), 2),
             (point(4, 2), 3), (point(1, 3), 1), (point(2, 3), 0), (point(3, 3), 1)
-        ).iter().cloned().collect();
+        ].into_iter().collect();
         assert_eq!(bfs_routes_lens, expected_routes);
         assert_eq!(djk_routes_lens, expected_routes);
 

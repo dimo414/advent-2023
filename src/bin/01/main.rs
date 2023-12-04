@@ -3,10 +3,10 @@ use anyhow::*;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-const DIGITS: &'static [&'static str] = &["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-const WORDS: &'static [&'static str] = &["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const DIGITS: &[&str] = &["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const WORDS: &[&str] = &["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
-const LOOKUP: Lazy<HashMap<&'static str, u32>> = Lazy::new(||
+static LOOKUP: Lazy<HashMap<&'static str, u32>> = Lazy::new(||
     DIGITS.iter().enumerate().chain(WORDS.iter().enumerate()).map(|(i,&w)| (w, i as u32)).collect());
 
 static DIGITS_RE: Lazy<Regex> = Lazy::new(|| Regex::new(&DIGITS.join("|")).unwrap());

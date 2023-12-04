@@ -8,8 +8,8 @@ use advent_2023::euclid::{Point, point};
 fn main() -> Result<()> {
     let schematic: Schematic = include_str!("input.txt").parse()?;
     println!("Part number sum: {}", schematic.valid_part_ids().iter().sum::<u32>());
-    println!("Gear ratios product: {}", schematic.all_gears().iter()
-        .map(|(_, v)| v.iter().product::<u32>()).sum::<u32>());
+    println!("Gear ratios product: {}", schematic.all_gears().values()
+        .map(|v| v.iter().product::<u32>()).sum::<u32>());
 
     Ok(())
 }
@@ -87,7 +87,7 @@ impl FromStr for Schematic {
             }
             for (x, c) in line.chars().enumerate() {
                 let x = x as i32;
-                if c != '.' && !c.is_digit(10) {
+                if c != '.' && !c.is_ascii_digit() {
                     symbols.insert(point(x, y), c);
                 }
             }
