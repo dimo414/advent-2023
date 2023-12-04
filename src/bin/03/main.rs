@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::*;
 use lazy_regex::regex;
 
-use advent_2023::euclid::{Point, point};
+use advent_2023::euclid::{bounds, Bounds, Point, point};
 
 fn main() -> Result<()> {
     let schematic: Schematic = include_str!("input.txt").parse()?;
@@ -17,8 +17,7 @@ fn main() -> Result<()> {
 #[derive(Debug)]
 struct Part {
     id: u32,
-    min: Point,
-    max: Point,
+    pos: Bounds,
 }
 
 #[derive(Debug)]
@@ -30,8 +29,8 @@ struct Schematic {
 impl Schematic {
     #[allow(dead_code)]
     fn valid_part_any_symbol(&self, part: &Part) -> bool {
-        for y in part.min.y-1..=part.max.y+1 {
-            for x in part.min.x-1..=part.max.x+1 {
+        for y in part.pos.min.y-1..=part.pos.max.y+1 {
+            for x in part.pos.min.x-1..=part.pos.max.x+1 {
                 let p = point(x, y);
                 if self.symbols.contains_key(&p) {
                     return true;
@@ -42,8 +41,9 @@ impl Schematic {
     }
 
     fn valid_part_each_symbol(&self, part: &Part) -> bool {
+        let adjacent = bounds(point(part.pos.min.x-1, part.pos.min.y-1), point(part.pos.max.x+1, part.pos.max.y+1));
         for symbol in self.symbols.keys() {
-            if symbol.in_bounds(point(part.min.x-1, part.min.y-1), point(part.max.x+1, part.max.y+1)) {
+            if adjacent.contains(*symbol) {
                 return true;
             }
         }
@@ -59,8 +59,8 @@ impl Schematic {
     fn all_gears(&self) -> HashMap<Point, Vec<u32>> {
         let mut gears: HashMap<Point, Vec<u32>> = HashMap::new();
         for part in &self.parts {
-            for y in part.min.y-1..=part.max.y+1 {
-                for x in part.min.x - 1..=part.max.x + 1 {
+            for y in part.pos.min.y-1..=part.pos.max.y+1 {
+                for x in part.pos.min.x - 1..=part.pos.max.x + 1 {
                     let p = point(x, y);
                     if self.symbols.get(&p) == Some(&'*') {
                         gears.entry(p).and_modify(|v| v.push(part.id)).or_insert(vec!(part.id));
@@ -82,7 +82,10 @@ impl FromStr for Schematic {
         for (y, line) in s.lines().enumerate() {
             let y = y as i32;
             for m in number_re.captures_iter(line).map(|c| c.get(0).expect("0-match")) {
-                let part = Part{id: m.as_str().parse()?, min: point(m.start() as i32, y), max: point(m.end() as i32 - 1, y), };
+                let part = Part{
+                    id: m.as_str().parse()?,
+                    pos: bounds(point(m.start() as i32, y), point(m.end() as i32 - 1, y)),
+                };
                 parts.push(part);
             }
             for (x, c) in line.chars().enumerate() {
