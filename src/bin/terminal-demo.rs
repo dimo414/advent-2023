@@ -49,10 +49,12 @@ fn main() {
                 for i in 0..(width-1) { // Notice the image an odd number of pixels tall
                     for j in 0..width {
                         let idx = 100 - i - j + self.offset;
+                        // stretch each pixel 2-wide (and adjust width below) to demo deduping codes
+                        pixels.push(COLORS[idx % COLORS.len()]);
                         pixels.push(COLORS[idx % COLORS.len()]);
                     }
                 }
-                TerminalImage{ pixels, width, }
+                TerminalImage{ pixels, width: width*2, }
             }
         }
 

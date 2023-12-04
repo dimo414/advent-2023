@@ -35,15 +35,21 @@ fn append_escapes(formats: &[&dyn FormattingCode], out: &mut String) {
         format.append_code(out);
         out.push(';');
     }
-    out.pop(); // Remove trailing ;
-    out.push('m');
+    // Swap the trailing ; for an m - this is safe since we know the last byte is a ;
+    // Could be written safely as `out.pop(); out.push('m');`
+    unsafe {
+        let vec = out.as_mut_vec();
+        let len = vec.len();
+        debug_assert_eq!(vec[len-1], b';');
+        vec[len-1] = b'm';
+    }
 }
 
 fn append_formatting_off(out: &mut String) {
     out.push_str("\x1B[0m");
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Color {
     BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, GREY,
     WHITE,
@@ -142,17 +148,20 @@ impl std::fmt::Display for TerminalImage {
         let mut out = String::new();
         out.reserve(self.pixels.len()*10);
 
-        // TODO don't append identical escape codes
         for r in (0..(self.pixels.len()/self.width)).step_by(2) {
+            let mut last_colors = None;
             for c in 0..self.width {
                 let i = self.width*r+c;
                 let j = i+self.width;
-                let i_color = self.pixels[i];
-                if let Some(j_color) = self.pixels.get(j) {
-                    append_escapes(&[&i_color, &j_color.bg()], &mut out);
-                } else {
-                    i_color.append_escape(&mut out);
+                let colors = (self.pixels[i], self.pixels.get(j));
+                // don't write color sequences if they haven't changed since the last column
+                if last_colors.is_none() || last_colors.expect("Checked not-none") != colors {
+                    match colors {
+                        (i_color, Some(j_color)) => append_escapes(&[&i_color, &j_color.bg()], &mut out),
+                        (i_color, None) => i_color.append_escape(&mut out),
+                    };
                 }
+                last_colors = Some(colors);
                 out.push('▀');
             }
             append_formatting_off(&mut out);
