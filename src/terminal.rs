@@ -182,8 +182,8 @@ mod disabled {
     impl Terminal {
         #[inline] pub fn init() -> bool { false } // return a value to bypass clippy::let_unit_value
         #[inline] pub fn active() -> bool { false }
-        #[inline] pub fn interactive_display(_lazy: impl ToString, _delay: std::time::Duration) {}
-        #[inline] pub fn interactive_render(_lazy: &impl TerminalRender, _delay: std::time::Duration) {}
+        #[inline] pub fn interactive_display(_lazy: impl ToString, _delay_until: std::time::Instant) {}
+        #[inline] pub fn interactive_render(_lazy: &impl TerminalRender, _delay_until: std::time::Instant) {}
         #[inline] pub fn end_interactive() {}
         #[inline] pub fn clear_interactive() {}
 
@@ -245,6 +245,14 @@ mod real {
 
         #[inline] pub fn active() -> bool { true }
 
+        // TODO(https://github.com/rust-lang/rust/issues/113752) swap for std::thread::sleep_until
+        #[inline]
+        fn sleep_until(deadline: Instant) {
+            if let Some(delay) = deadline.checked_duration_since(Instant::now()) {
+                std::thread::sleep(delay);
+            }
+        }
+
         fn interactive_print(str: String, print_height: usize) {
             debug_assert!(!str.ends_with('\n'), "String should not have trailing newlines");
 
@@ -277,26 +285,25 @@ mod real {
         // Prints the given input to the console, ensuring that it fits within the terminal window
         // and recording its height so subsequent calls to Terminal functions will overwrite it.
         // The cursor is left on the last line of the terminal at the first column, which is blank.
-        pub fn interactive_display(lazy: impl ToString, delay: std::time::Duration) {
+        pub fn interactive_display(lazy: impl ToString, delay_until: Instant) {
             let (term_width, term_height) = term_size::dimensions().expect("Interactive mode unsupported");
             let print_height = term_height-1; // Leave one line for the cursor
             let mut str = lazy.to_string();
             truncate_string(&mut str, term_width, print_height);
             Terminal::interactive_print(str, print_height);
-            std::thread::sleep(delay);
+            Terminal::sleep_until(delay_until);
         }
 
         // Prints the given input to the console as an image, ensuring that it fits within the
         // terminal window, and recording its height so subsequent calls to Terminal functions will
         // overwrite it. The cursor is left on the last line of the terminal at the first column,
         // which is blank.
-        pub fn interactive_render(lazy: &impl TerminalRender, delay: std::time::Duration) {
-            let start = Instant::now();
+        pub fn interactive_render(lazy: &impl TerminalRender, delay_until: Instant) {
             let (term_width, term_height) = term_size::dimensions().expect("Interactive mode unsupported");
             let print_height = term_height-1; // Leave one line for the cursor
             let image = lazy.render(term_width, 2*print_height).truncate(term_width, print_height);
             Terminal::interactive_print(image.to_string(), print_height);
-            std::thread::sleep(delay.saturating_sub(Instant::now() - start));
+            Terminal::sleep_until(delay_until);
         }
 
         // Resets the interactive cursor's position, so that subsequent interactive calls will not

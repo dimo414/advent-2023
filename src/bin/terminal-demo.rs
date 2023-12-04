@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use advent_2023::terminal::{Color, Terminal, TerminalImage, TerminalRender};
 
 fn main() {
@@ -26,6 +26,7 @@ fn main() {
     fn expand(args: &[String]) {
         let n = args.get(0).map(|a| a.parse().expect("Invalid num")).unwrap_or(50);
         for i in (0..=n).chain((0..n).rev()) {
+            let start = Instant::now();
             let mut print = i.to_string();
             print.push('\n');
             for _ in 0..i {
@@ -33,7 +34,7 @@ fn main() {
                 print.push_str(&c.repeat(i));
                 print.push('\n');
             }
-            Terminal::interactive_display(print, Duration::from_millis(200));
+            Terminal::interactive_display(print, start + Duration::from_millis(200));
         }
     }
 
@@ -59,13 +60,15 @@ fn main() {
         }
 
         for offset in 0..100 {
-            Terminal::interactive_render(&Rainbow{offset}, Duration::from_millis(100));
+            let start = Instant::now();
+            Terminal::interactive_render(&Rainbow{offset}, start + Duration::from_millis(100));
         }
     }
 
     fn one_line() {
         for i in (0..=200).rev() {
-            Terminal::interactive_display(i, Duration::from_millis(20));
+            let start = Instant::now();
+            Terminal::interactive_display(i, start + Duration::from_millis(20));
         }
         std::thread::sleep(Duration::from_secs(1));
         println!("Final Message");
