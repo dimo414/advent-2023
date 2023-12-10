@@ -41,9 +41,8 @@ impl FromStr for Almanac {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let mut lines = s.lines();
         let mut mappings = Vec::new();
-        while let Some(line) = lines.next() {
+        for line in s.lines() {
             if line.is_empty() {
                 // skip
             } else if line.contains(" map:") {
