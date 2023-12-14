@@ -112,6 +112,63 @@ impl FormattingCode for BgColor {
     }
 }
 
+pub trait TerminalDisplay {
+    fn colored_display(&self, width_hint: usize, height_hint: usize) -> TerminalString;
+}
+
+pub struct TerminalString {
+    pub pixels: Vec<(char, Option<Color>)>,
+    pub width: usize,
+}
+
+impl TerminalString {
+    fn truncate(mut self, max_width: usize, max_height: usize) -> TerminalString {
+        if max_width < self.width {
+            let mut trunc = TerminalString{ pixels: Vec::new(), width: max_width, };
+            let max_len = max_height * max_width;
+            let mut row = 0;
+            while trunc.pixels.len() < max_len {
+                trunc.pixels.extend(self.pixels.iter().skip(row*self.width).take(trunc.width));
+                row += 1;
+            }
+            debug_assert_eq!(trunc.pixels.len(), row * trunc.width);
+            return trunc;
+        }
+        // Otherwise we can just truncate the excess rows. This is a no-op if image isn't too tall.
+        self.pixels.truncate(max_height * self.width);
+        self
+    }
+}
+
+impl std::fmt::Display for TerminalString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        assert_eq!(self.pixels.len() % self.width, 0, "Incomplete image; {} pixels over {} columns", self.pixels.len(), self.width);
+        let mut out = String::new();
+        out.reserve(self.pixels.len()*10);
+
+        for r in 0..(self.pixels.len()/self.width) {
+            let mut last_color = None;
+            for c in 0..self.width {
+                let i = self.width*r+c;
+                let (ch, color) = self.pixels[i];
+                // don't write color sequences if they haven't changed since the last column
+                if last_color != color {
+                    match color {
+                        Some(color) => color.append_escape(&mut out),
+                        None => append_formatting_off(&mut out),
+                    }
+                }
+                last_color = color;
+                out.push(ch);
+            }
+            append_formatting_off(&mut out);
+            out.push('\n');
+        }
+        out.pop(); // Remove trailing newline
+        write!(f, "{}", out)
+    }
+}
+
 pub trait TerminalRender {
     fn render(&self, width_hint: usize, height_hint: usize) -> TerminalImage;
 }
@@ -183,14 +240,16 @@ mod disabled {
         #[inline] pub fn init() -> bool { false } // return a value to bypass clippy::let_unit_value
         #[inline] pub fn active() -> bool { false }
         #[inline] pub fn interactive_display(_lazy: impl ToString, _delay_until: std::time::Instant) {}
+        #[inline] pub fn interactive_color_display(_lazy: &impl TerminalDisplay, _delay_until: std::time::Instant) {}
         #[inline] pub fn interactive_render(_lazy: &impl TerminalRender, _delay_until: std::time::Instant) {}
         #[inline] pub fn end_interactive() {}
         #[inline] pub fn clear_interactive() {}
 
         // Throwaway method that calls TerminalImage.truncate() so that method is not considered unused
         #[allow(dead_code)]
-        fn disregard(img: TerminalImage) {
+        fn disregard(img: TerminalImage, str: TerminalString) {
             img.truncate(0,0);
+            str.truncate(0, 0);
             unreachable!();
         }
     }
@@ -202,7 +261,7 @@ pub use self::real::*;
 mod real {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Instant;
-    use crate::terminal::TerminalRender;
+    use super::*;
 
     static CURSOR_SHIFT: AtomicUsize = AtomicUsize::new(0);
     static CLEAR_END_OF_LINE: bool = true;
@@ -216,8 +275,7 @@ mod real {
     // function must be called before any terminal escape sequences are inserted.
     // str will _not_ end with a newline character after this returns.
     fn truncate_string(str: &mut String, width: usize, height: usize) {
-        let (_w, _h) = (width, height);
-        str.truncate(str.trim().len());
+        str.truncate(str.trim_end().len());
         if !CLEAR_END_OF_LINE {
             // Short-circuit if we're not adding escape sequences to each line and the string fits
             if str.lines().count() <= height && str.lines().all(|l| l.len() <= width) {
@@ -291,6 +349,18 @@ mod real {
             let mut str = lazy.to_string();
             truncate_string(&mut str, term_width, print_height);
             Terminal::interactive_print(str, print_height);
+            Terminal::sleep_until(delay_until);
+        }
+
+        // Prints the given input to the console, applying colors to characters. Ensures the
+        // printed output fits within the terminal window and records its height so subsequent calls
+        // to Terminal functions will overwrite it. The cursor is left on the last line of the
+        // terminal at the first column, which is blank.
+        pub fn interactive_color_display(lazy: &impl TerminalDisplay, delay_until: Instant) {
+            let (term_width, term_height) = term_size::dimensions().expect("Interactive mode unsupported");
+            let print_height = term_height-1; // Leave one line for the cursor
+            let image = lazy.colored_display(term_width, term_height).truncate(term_width, term_height);
+            Terminal::interactive_print(image.to_string(), print_height);
             Terminal::sleep_until(delay_until);
         }
 
