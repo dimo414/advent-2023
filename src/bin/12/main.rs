@@ -19,7 +19,7 @@ fn main() -> Result<()> {
         let partial = &input[0..3];
         elapsed!("Construct valid unfolded (0..3)", partial.iter().map(|r| r.construct_valid_rows().len()).sum::<usize>());
         elapsed!("Count valid unfolded (0..3)", partial.iter().map(|r| r.count_valid_rows()).sum::<u64>());
-        elapsed!("Count cached unfolded (0..3)", count_valid_rows_cached(&partial).iter().sum::<u64>());
+        elapsed!("Count cached unfolded (0..3)", count_valid_rows_cached(partial).iter().sum::<u64>());
     }
 
     println!("Possible unfolded arrangements: {}", elapsed!("Count cached unfolded", count_valid_rows_cached(&input).iter().sum::<u64>()));
@@ -162,7 +162,7 @@ fn parse_input(input: &str) -> Result<Vec<Record>> {
 }
 
 fn parse_unfolded_input(input: &str) -> Result<Vec<Record>> {
-    input.lines().map(|l| unfold_line(l)).map(|r| r.and_then(|l| l.parse())).collect()
+    input.lines().map(|l| unfold_line(l).and_then(|u| u.parse())).collect()
 }
 
 #[cfg(test)]

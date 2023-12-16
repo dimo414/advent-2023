@@ -26,7 +26,7 @@ impl FromStr for Op {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if s.chars().last() == Some('-') {
+        if s.ends_with('-') {
             Ok(Op::Rm(s[..s.len()-1].to_string()))
         } else {
             let (s, f) = s.split('=').collect_tuple().context("Invalid")?;
@@ -73,7 +73,7 @@ impl<'a> Debug for Hashmap<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for (idx, bucket) in self.data.iter().enumerate() {
             if !bucket.is_empty() {
-                write!(f, "{}: {}\n", idx, bucket.iter().map(|(k, v)| format!("[{} {}]", k, v)).join(" "))?;
+                writeln!(f, "{}: {}", idx, bucket.iter().map(|(k, v)| format!("[{} {}]", k, v)).join(" "))?;
             }
         }
         Result::Ok(())

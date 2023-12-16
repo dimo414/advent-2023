@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn part1() {
-        let input = parse_input(&include_str!("example.txt")).unwrap();
+        let input = parse_input(include_str!("example.txt")).unwrap();
         let ordered: Vec<_> = input.iter().sorted()
             .map(|(h, b)| (h.str.as_str(), *b)).collect();
         assert_eq!(ordered, [("32T3K", 765), ("KTJJT", 220), ("KK677", 28), ("T55J5", 684), ("QQQJA", 483)]);

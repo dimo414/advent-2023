@@ -47,7 +47,7 @@ fn fold_lcm<'a>(inputs: impl IntoIterator<Item=&'a u64>) -> u64 {
 
 #[cfg(test)]
 fn steps_to_all(dirs: &str, paths: &HashMap<String, (String, String)>) -> u64 {
-    let mut curs: Vec<_> = all_starts(&paths).collect();
+    let mut curs: Vec<_> = all_starts(paths).collect();
     let n = curs.len();
     let mut steps = 0;
     for dir in dirs.chars().cycle() {

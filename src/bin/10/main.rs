@@ -46,7 +46,7 @@ impl Pipe {
         }
     }
 
-    fn to_char(&self) -> char {
+    fn to_char(self) -> char {
         use Pipe::*;
         match self {
             Vertical => '║',
