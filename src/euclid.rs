@@ -167,6 +167,10 @@ mod bounds {
             self.min.x <= pos.x && self.min.y <= pos.y && self.max.x >= pos.x && self.max.y >= pos.y
         }
 
+        pub fn area(&self) -> i32 {
+            (self.max.x - self.min.x + 1) * (self.max.y - self.min.y + 1)
+        }
+
         pub fn iter(&self) -> impl Iterator<Item = Point> + '_ {
             self.iter_rows().flatten()
         }
@@ -195,6 +199,12 @@ mod bounds {
             let bound = bounds(zero_zero, two_two);
             assert!(bound.contains(two_two));
             assert!(!bound.contains(five_six));
+        }
+
+        #[test]
+        fn area() {
+            let bound = bounds(point(-1, -1), point(2, 4));
+            assert_eq!(bound.area(), 4*6);
         }
 
         #[test]
