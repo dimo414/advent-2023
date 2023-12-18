@@ -220,7 +220,7 @@ mod vector {
     use std::ops::{Add,AddAssign,Mul};
     use anyhow::{Error, Result};
 
-    #[derive(Copy, Clone, PartialEq, Eq, Hash)]
+    #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
     pub struct Vector {
         pub x: i32,
         pub y: i32,
@@ -262,6 +262,10 @@ mod vector {
         pub fn grid_len(&self) -> u32 {
             (self.x.abs() + self.y.abs()) as u32
         }
+
+        pub fn left90(&self) -> Self { vector(-self.y, self.x) }
+
+        pub fn right90(&self) -> Self { vector(self.y, -self.x) }
     }
 
     impl Add<Vector> for Vector {
@@ -350,6 +354,13 @@ mod vector {
             d: (point(1,1), point(1,5), 4),
             e: (point(1,1), point(8,3), 9),
             f: (point(1,1), point(-1,-1), 4),
+        }
+
+        #[test]
+        fn turns() {
+            let v = vector(2, 1);
+            assert_eq!(v.right90(), vector(1, -2));
+            assert_eq!(v.left90(), vector(-1, 2));
         }
     }
 }
