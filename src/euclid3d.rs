@@ -26,27 +26,6 @@ mod point {
 
     impl Point {
         pub const ORIGIN: Point = point(0, 0, 0);
-
-        pub fn bounding_box<'a>(points: impl IntoIterator<Item = &'a Point>) -> Option<(Point, Point)> {
-            points.into_iter().fold(None, |r , c|
-                match r {
-                    Some((min, max)) => {
-                        Some((
-                            point(cmp::min(min.x, c.x), cmp::min(min.y, c.y), cmp::min(min.z, c.z)),
-                            point(cmp::max(max.x, c.x), cmp::max(max.y, c.y), cmp::max(max.z, c.z))
-                        ))
-                    },
-                    None => Some((*c, *c)),
-                }
-            )
-        }
-
-        pub fn in_bounds(&self, min: Point, max: Point) -> bool {
-            assert!(min.x <= max.x);
-            assert!(min.y <= max.y);
-            assert!(min.z <= max.z);
-            min.x <= self.x && min.y <= self.y && min.z <= self.z && max.x >= self.x && max.y >= self.y && max.z >= self.z
-        }
     }
 
     impl Add<&Vector> for Point {
@@ -147,22 +126,6 @@ mod point {
         }
 
         #[test]
-        fn bounding() {
-            let points = vec!(point(1, 2, 3), point(2, 3, 4), point(0, 5, 3));
-            assert_eq!(Point::bounding_box(&points), Some((point(0, 2, 3), point(2, 5, 4))));
-        }
-
-        #[test]
-        fn in_bounds() {
-            let zero_zero_zero = point(0, 0, 0);
-            let two_two_two = point(2, 2, 2);
-            let five_six_seven = point(5, 6, 7);
-            assert!(zero_zero_zero.in_bounds(zero_zero_zero, two_two_two));
-            assert!(two_two_two.in_bounds(zero_zero_zero, two_two_two));
-            assert!(!five_six_seven.in_bounds(zero_zero_zero, two_two_two));
-        }
-
-        #[test]
         fn add() {
             assert_eq!(point(1, 0, 2) + vector(2, 3, 1), point(3, 3, 3));
         }
@@ -173,6 +136,101 @@ mod point {
     }
 }
 pub use self::point::{Point,point};
+
+mod bounds {
+    use super::*;
+
+    #[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+    pub struct Bounds {
+        pub min: Point,
+        pub max: Point,
+    }
+
+    #[inline]
+    pub const fn bounds(min: Point, max: Point) -> Bounds {
+        assert!(min.x <= max.x);
+        assert!(min.y <= max.y);
+        assert!(min.z <= max.z);
+        Bounds{ min, max }
+    }
+
+    impl Bounds {
+        pub fn from_points<'a>(points: impl IntoIterator<Item = &'a Point>) -> Option<Bounds> {
+            let bound: Option<(Point, Point)> = points.into_iter().fold(None, |r , c|
+                match r {
+                    Some((min, max)) => {
+                        Some((
+                            point(cmp::min(min.x, c.x), cmp::min(min.y, c.y), cmp::min(min.z, c.z)),
+                            point(cmp::max(max.x, c.x), cmp::max(max.y, c.y), cmp::max(max.z, c.z))
+                        ))
+                    },
+                    None => Some((*c, *c)),
+                }
+            );
+            bound.map(|(min, max)| bounds(min, max))
+        }
+
+        pub fn contains(&self, pos: Point) -> bool {
+            self.min.x <= pos.x && self.min.y <= pos.y && self.min.z <= pos.z && self.max.x >= pos.x && self.max.y >= pos.y && self.max.z >= pos.z
+        }
+
+        pub fn iter(&self) -> impl Iterator<Item = Point> + '_ {
+            self.iter_planes().flatten().flatten()
+        }
+
+        pub fn iter_planes(&self) -> impl Iterator<Item = impl Iterator<Item = impl Iterator<Item = Point> + '_> + '_> {
+            (self.min.z..=self.max.z).map(move |z| (self.min.y..=self.max.y)
+                .map(move |y| (self.min.x..=self.max.x)
+                    .map(move |x| point(x, y, z))))
+        }
+    }
+
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn bounding() {
+            let points = vec!(point(1, 2, 3), point(2, 3, 4), point(0, 5, 3));
+            assert_eq!(Bounds::from_points(&points), Some(bounds(point(0, 2, 3), point(2, 5, 4))));
+        }
+
+        #[test]
+        fn in_bounds() {
+            let zero_zero_zero = point(0, 0, 0);
+            let two_two_two = point(2, 2, 2);
+            let five_six_seven = point(5, 6, 7);
+            let bound = bounds(zero_zero_zero, two_two_two);
+            assert!(bound.contains(zero_zero_zero));
+            assert!(bound.contains(two_two_two));
+            assert!(!bound.contains(five_six_seven));
+        }
+
+        #[test]
+        fn display_bounds() {
+            let points = [point(1, 2, 1), point(3, 1, 2), point(0, -1, 1)];
+            let display_points: Vec<Vec<Vec<_>>> = Bounds::from_points(&points).unwrap().iter_planes()
+                .map(|plane| plane.map(|row| row.collect()).collect())
+                .collect();
+            assert_eq!(display_points, vec![
+                vec![
+                    vec![point(0, -1, 1), point(1, -1, 1), point(2, -1, 1), point(3, -1, 1)],
+                    vec![point(0, 0, 1), point(1, 0, 1), point(2, 0, 1), point(3, 0, 1)],
+                    vec![point(0, 1, 1), point(1, 1, 1), point(2, 1, 1), point(3, 1, 1)],
+                    vec![point(0, 2, 1), point(1, 2, 1), point(2, 2, 1), point(3, 2, 1)],
+                ],
+                vec![
+                    vec![point(0, -1, 2), point(1, -1, 2), point(2, -1, 2), point(3, -1, 2)],
+                    vec![point(0, 0, 2), point(1, 0, 2), point(2, 0, 2), point(3, 0, 2)],
+                    vec![point(0, 1, 2), point(1, 1, 2), point(2, 1, 2), point(3, 1, 2)],
+                    vec![point(0, 2, 2), point(1, 2, 2), point(2, 2, 2), point(3, 2, 2)],
+                ]
+            ]);
+        }
+    }
+}
+pub use self::bounds::{Bounds,bounds};
 
 mod vector {
     use super::*;
