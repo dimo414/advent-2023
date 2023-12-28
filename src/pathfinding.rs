@@ -305,9 +305,10 @@ pub use self::internal::{Edge,Graph};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::euclid::{point,Point,vector};
-    use std::collections::{BTreeMap};
-    use ahash::AHashSet;
+    use crate::euclid::{point, Point, Vector};
+    use std::collections::BTreeMap;
+    use std::rc::Rc;
+    use ahash::{AHashMap, AHashSet};
 
     struct BasicGraph {
         blocked: AHashSet<Point>,
@@ -325,8 +326,7 @@ mod tests {
         fn neighbors(&self, source: &Self::Node) -> Vec<Edge<Self::Node>> {
             if self.blocked.contains(source) { return vec!(); }
 
-            [vector(0, 1), vector(1, 0), vector(0, -1), vector(-1, 0)]
-                .into_iter()
+            Vector::CARDINAL.iter()
                 .map(|v| source + v)
                 .filter(|p| !self.blocked.contains(p))
                 .map(|d| Edge::new(1, *source, d))
@@ -412,5 +412,53 @@ mod tests {
         // This is not strictly true, but there's only one route to this point for this graph,
         // so it should be reliable for this test case
         assert_eq!(&bfs_route, bfs_all_route);
+    }
+
+    struct RcGraph {
+        edges: AHashMap<Rc<str>, Vec<Rc<str>>>,
+    }
+
+    impl RcGraph {
+        fn new(edge_pairs: &[(&str, &str)]) -> RcGraph {
+            let mut graph = RcGraph{ edges: AHashMap::new() };
+            for &(source, dest) in edge_pairs {
+                let source = graph.intern(source);
+                let dest = graph.intern(dest);
+                graph.edges.get_mut(&source).expect("Interned").push(dest);
+            }
+            graph
+        }
+
+        fn intern(&mut self, node: &str) -> Rc<str> {
+            match self.edges.get_key_value(node) {
+                Some((k, _)) => k.clone(),
+                None => {
+                    let node: Rc<str> = Rc::from(node);
+                    self.edges.insert(node.clone(), Vec::new());
+                    node
+                }
+            }
+        }
+    }
+
+    impl Graph for RcGraph {
+        type Node = Rc<str>;
+
+        fn neighbors(&self, source: &Self::Node) -> Vec<Edge<Self::Node>> {
+            self.edges.get(source).into_iter()
+                .flat_map(|dest| dest.into_iter().map(|d| Edge::new(1, source.clone(), d.clone())))
+                .collect()
+        }
+    }
+
+    #[test]
+    fn refcounted() {
+        let mut graph = RcGraph::new(&[("A", "B"), ("B", "C"), ("C", "D")]);
+        let start = graph.intern("A");
+        let bfs_route = graph.bfs(&start, |n| n.as_ref() == "D").unwrap();
+
+        assert_eq!(bfs_route.len(), 4);
+        assert_eq!(bfs_route.first().unwrap().as_ref(), "A");
+        assert_eq!(bfs_route.last().unwrap().as_ref(), "D");
     }
 }
