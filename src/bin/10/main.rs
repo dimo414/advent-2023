@@ -115,8 +115,9 @@ impl Map {
         assert_eq!(neighbors.len(), 2);
         match neighbors[..] {
             [Vector{x:-1, y:0}, Vector{x:0, y:-1}] => { Pipe::NorthWest },
+            [Vector{x:-1, y:0}, Vector{x:0, y:1}] => { Pipe::SouthWest },
             [Vector{x:0, y:1}, Vector{x:1, y:0}] => { Pipe::SouthEast },
-            _ => panic!("{:?}", neighbors),
+            _ => unimplemented!("{:?}", neighbors),
         }
     }
 
@@ -281,6 +282,7 @@ mod tests {
         e2: (include_str!("example2.txt"), 8),
         e3: (include_str!("example3.txt"), 23), // unspecified
         e4: (include_str!("example4.txt"), 70), // unspecified
+        e5: (include_str!("example5.txt"), 80), // unspecified
     }
 
     parameterized_test::create!{ interior, (s, expected), {
@@ -293,5 +295,6 @@ mod tests {
         e2: (include_str!("example2.txt"), 1),
         e3: (include_str!("example3.txt"), 4),
         e4: (include_str!("example4.txt"), 8),
+        e5: (include_str!("example5.txt"), 10),
     }
 }
