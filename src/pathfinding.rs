@@ -1,9 +1,12 @@
 mod internal {
-    use std::collections::{VecDeque, BinaryHeap};
+    use std::collections::{VecDeque, BinaryHeap, HashSet};
     use std::cmp::Ordering;
     use std::fmt::Debug;
+    use std::fmt::Write;
     use std::hash::Hash;
     use ahash::{AHashMap, AHashSet};
+    use anyhow::{ensure, Result};
+    use crate::collect::DisjointSet;
 
     // References:
     // https://www.redblobgames.com/pathfinding/a-star/introduction.html
@@ -299,16 +302,110 @@ mod internal {
             Some(self.cmp(other))
         }
     }
+
+    pub trait NodeGraph: Graph {
+        fn nodes(&self) -> Vec<Self::Node>;
+
+        // http://magjac.com/graphviz-visual-editor/
+        // https://dreampuf.github.io/GraphvizOnline/
+        fn graphviz_directed(&self) -> String {
+            let mut out = String::new();
+            out.push_str("digraph G {\n");
+            for node in self.nodes() {
+                writeln!(out, "{:?}", node).expect("Impossible");
+                for edge in self.neighbors(&node) {
+                    if edge.weight != 1 {
+                        writeln!(out, "{:?} -> {:?} [label={}]", edge.source(), edge.dest(), edge.weight()).expect("Impossible");
+                    } else {
+                        writeln!(out, "{:?} -> {:?}", edge.source(), edge.dest()).expect("Impossible");
+                    }
+                }
+            }
+
+            out.push_str("}\n");
+            out
+        }
+
+        fn graphviz_undirected(&self) -> Result<String> {
+            let mut out = String::new();
+            let mut seen = HashSet::new();
+            out.push_str("graph G {\n");
+            for node in self.nodes() {
+                writeln!(out, "{:?}", node).expect("Impossible");
+                for edge in self.neighbors(&node) {
+                    if !seen.remove(&(edge.dest().clone(), edge.source().clone())) {
+                        if edge.weight != 1 {
+                            writeln!(out, "{:?} -- {:?} [label={}]", edge.source(), edge.dest(), edge.weight()).expect("Impossible");
+                        } else {
+                            writeln!(out, "{:?} -- {:?}", edge.source(), edge.dest()).expect("Impossible");
+                        }
+                        seen.insert((edge.source().clone(), edge.dest().clone()));
+                    }
+                }
+            }
+            ensure!(seen.is_empty(), "Unbalanced edges, graph is not undirected: {:?}", seen);
+
+            out.push_str("}\n");
+            Ok(out)
+        }
+
+        fn spanning_tree(&self) -> Result<Vec<Edge<Self::Node>>> {
+            let mut ret = Vec::new();
+            let mut edges = self.nodes().iter().flat_map(|n| self.neighbors(n)).collect::<Vec<_>>();
+            edges.sort_by_key(|e| e.weight());
+            let edges = edges;
+
+            let nodes = self.nodes();
+            let num_nodes = nodes.len();
+            let mut sets = DisjointSet::create(nodes);
+            for edge in edges {
+                let source = edge.source();
+                let dest = edge.dest();
+                if sets.union(source, dest) { // critical edge
+                    let cur_set_size = sets.set_size(source);
+                    ret.push(edge);
+                    if cur_set_size == num_nodes { break; }
+                }
+            }
+            let roots = sets.roots();
+            ensure!(roots.len() == 1, "Disjoint graph: {:?}", roots);
+            Ok(ret)
+        }
+
+        // TBD if this is needed vs. what DisjointSet can do
+        fn forest(&self) -> Vec<HashSet<Self::Node>> {
+            let mut ret = Vec::new();
+            let mut unseen: HashSet<_> = self.nodes().into_iter().collect();
+
+            while !unseen.is_empty() {
+                let source = unseen.iter().next().expect("Non-empty");
+                let mut frontier = VecDeque::from([source.clone()]);
+                let mut cur_tree = HashSet::new();
+                while let Some(current) = frontier.pop_front() {
+                    if cur_tree.contains(&current) { continue; }
+                    assert!(unseen.remove(&current), "{:?} is already in another tree ({:?}); is this graph undirected?", current, ret);
+                    for edge in self.neighbors(&current) {
+                        frontier.push_back(edge.dest);
+                    }
+                    cur_tree.insert(current);
+                }
+                ret.push(cur_tree);
+            }
+
+            ret
+        }
+    }
 }
-pub use self::internal::{Edge,Graph};
+pub use self::internal::{Edge,Graph,NodeGraph};
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::euclid::{point, Point, Vector};
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashSet};
     use std::rc::Rc;
     use ahash::{AHashMap, AHashSet};
+    use itertools::Itertools;
 
     struct BasicGraph {
         blocked: AHashSet<Point>,
@@ -415,18 +512,26 @@ mod tests {
     }
 
     struct RcGraph {
-        edges: AHashMap<Rc<str>, Vec<Rc<str>>>,
+        edges: AHashMap<Rc<str>, Vec<(Rc<str>, i32)>>,
     }
 
     impl RcGraph {
-        fn new(edge_pairs: &[(&str, &str)]) -> RcGraph {
+        fn create<'a>(all_edges: impl IntoIterator<Item=(&'a str, &'a str, i32)>) -> RcGraph {
             let mut graph = RcGraph{ edges: AHashMap::new() };
-            for &(source, dest) in edge_pairs {
+            for (source, dest, weight) in all_edges {
                 let source = graph.intern(source);
                 let dest = graph.intern(dest);
-                graph.edges.get_mut(&source).expect("Interned").push(dest);
+                graph.edges.get_mut(&source).expect("Interned").push((dest, weight));
             }
             graph
+        }
+
+        fn undirected<'a>(all_edges: impl IntoIterator<Item=(&'a str, &'a str)>) -> RcGraph {
+            RcGraph::create(all_edges.into_iter().flat_map(|(s, d)| [(s, d, 1), (d, s, 1)].into_iter()))
+        }
+
+        fn directed<'a>(all_edges: impl IntoIterator<Item=(&'a str, &'a str)>) -> RcGraph {
+            RcGraph::create(all_edges.into_iter().map(|(s, d)| (s, d, 1)))
         }
 
         fn intern(&mut self, node: &str) -> Rc<str> {
@@ -446,19 +551,58 @@ mod tests {
 
         fn neighbors(&self, source: &Self::Node) -> Vec<Edge<Self::Node>> {
             self.edges.get(source).into_iter()
-                .flat_map(|dest| dest.into_iter().map(|d| Edge::new(1, source.clone(), d.clone())))
+                .flat_map(|dest| dest.iter().map(|(d,w)| Edge::new(*w, source.clone(), d.clone())))
                 .collect()
+        }
+    }
+
+    impl NodeGraph for RcGraph {
+        fn nodes(&self) -> Vec<Self::Node> {
+            self.edges.keys().cloned().collect()
         }
     }
 
     #[test]
     fn refcounted() {
-        let mut graph = RcGraph::new(&[("A", "B"), ("B", "C"), ("C", "D")]);
+        let mut graph = RcGraph::directed([("A", "B"), ("B", "C"), ("C", "D")]);
         let start = graph.intern("A");
         let bfs_route = graph.bfs(&start, |n| n.as_ref() == "D").unwrap();
 
         assert_eq!(bfs_route.len(), 4);
         assert_eq!(bfs_route.first().unwrap().as_ref(), "A");
         assert_eq!(bfs_route.last().unwrap().as_ref(), "D");
+    }
+    
+    #[test]
+    fn forest() {
+        let graph = RcGraph::undirected([("A", "B"), ("B", "C"), ("D", "E")]);
+        // sort the vec by length to ensure consistent ordering for the assertions
+        let forest = graph.forest().into_iter().sorted_by_key(|v| v.len()).collect_vec();
+        assert_eq!(forest, &[
+            HashSet::from([Rc::from("D"), Rc::from("E")]),
+            HashSet::from([Rc::from("A"), Rc::from("B"), Rc::from("C")])]);
+    }
+
+    #[test]
+    fn spanning_tree() {
+        let graph = RcGraph::create([("A", "B", 1), ("B", "A", 2), ("B", "C", 3), ("A", "B", 4), ("D", "E", 5), ("C", "D", 6)]);
+        let edges = graph.spanning_tree().unwrap()
+            .into_iter().map(|e| (e.source().to_string(), e.dest().to_string(), e.weight())).collect::<Vec<_>>();
+        println!("{:?}", edges);
+        assert_eq!(edges, [
+            ("A".to_string(), "B".to_string(), 1),
+            ("B".to_string(), "C".to_string(), 3),
+            ("D".to_string(), "E".to_string(), 5),
+            ("C".to_string(), "D".to_string(), 6)]);
+    }
+
+    #[test]
+    fn graphviz() {
+        // Not bothering to validate the syntax for now, just check the calls work
+        let graph = RcGraph::undirected([("A", "B"), ("B", "C"), ("D", "E")]);
+        let directed = graph.graphviz_directed();
+        assert!(directed.contains(" -> "));
+        let undirected = graph.graphviz_undirected().unwrap();
+        assert!(undirected.contains(" -- "));
     }
 }
