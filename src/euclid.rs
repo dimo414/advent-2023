@@ -167,9 +167,13 @@ mod bounds {
             self.min.x <= pos.x && self.min.y <= pos.y && self.max.x >= pos.x && self.max.y >= pos.y
         }
 
-        pub fn area(&self) -> i32 {
-            (self.max.x - self.min.x + 1) * (self.max.y - self.min.y + 1)
+        pub fn intersects(&self, other: Bounds) -> bool {
+            self.min.x <= other.max.x && self.max.x >= other.min.x && self.min.y <= other.max.y && self.max.y >= other.min.y
         }
+
+        pub fn size(&self) -> Vector { vector(self.max.x - self.min.x + 1, self.max.y - self.min.y + 1) }
+
+        pub fn area(&self) -> i32 { let s = self.size(); s.x * s.y }
 
         pub fn iter(&self) -> impl Iterator<Item = Point> + '_ {
             self.iter_rows().flatten()
@@ -202,8 +206,25 @@ mod bounds {
         }
 
         #[test]
-        fn area() {
+        fn intersects() {
+            let bounds_a = bounds(point(0, 0), point(3, 3));
+            let bounds_b = bounds(point(1, -1), point(4, 2));
+            let bounds_c = bounds(point(4, 2), point(5, 3));
+            assert!(bounds_a.intersects(bounds_b));
+            assert!(bounds_b.intersects(bounds_a));
+            assert!(!bounds_a.intersects(bounds_c));
+            assert!(!bounds_c.intersects(bounds_a));
+
+            let bounds_m = bounds(point(0, 0), point(2, 0));
+            let bounds_n = bounds(point(1, 0), point(1, 2));
+            assert!(bounds_m.intersects(bounds_n));
+            assert!(bounds_n.intersects(bounds_m));
+        }
+
+        #[test]
+        fn size_and_area() {
             let bound = bounds(point(-1, -1), point(2, 4));
+            assert_eq!(bound.size(), vector(4, 6));
             assert_eq!(bound.area(), 4*6);
         }
 
