@@ -87,6 +87,52 @@ impl<E: Clone+Hash+Eq> DisjointSet<E> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum Difference {
+    None,
+    One(Range),
+    Two(Range, Range),
+}
+
+// A closed-open interval from start to end.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Range {
+    start: i64,
+    end: i64,
+}
+
+impl Range {
+    pub const fn create(start: i64, end: i64) -> Range { assert!(start <= end); Range{ start, end } }
+
+    pub fn start(&self) -> i64 { self.start }
+    pub fn end(&self) -> i64 { self.end }
+
+    pub fn len(&self) -> u64 {
+        (self.end - self.start) as u64
+    }
+
+    pub fn contains(&self, value: i64) -> bool {
+        value >= self.start && value < self.end
+    }
+
+    pub fn intersect(&self, other: Range) -> Option<Range> {
+        if self.start > other.start { return other.intersect(*self); }
+        debug_assert!(self.start <= other.start);
+        if self.end <= other.start { return None; }
+        Some(Range::create(other.start, std::cmp::min(self.end, other.end)))
+    }
+
+    pub fn difference(&self, other: Range) -> Difference {
+        let left = Range::create(i64::MIN, other.start);
+        let right = Range::create(other.end, i64::MAX);
+        match (self.intersect(left), self.intersect(right)) {
+            (Some(left), Some(right)) => Difference::Two(left, right),
+            (Some(r), None) | (None, Some(r)) => Difference::One(r),
+            (None, None) => Difference::None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +170,76 @@ mod tests {
         assert_eq!(sets.set_size(&1), 5);
         assert_eq!(sets.set_size(&4), 2);
         assert_eq!(sets.set_size(&7), 1);
+    }
+
+    mod ranges {
+        use super::*;
+
+        #[test]
+        fn len() {
+            assert_eq!(Range::create(5, 10).len(), 5);
+            assert_eq!(Range::create(0, 1).len(), 1);
+        }
+
+        #[test]
+        fn contains() {
+            let r10_20 = Range::create(10, 20);
+            assert!(r10_20.contains(10));
+            assert!(r10_20.contains(15));
+            assert!(r10_20.contains(19));
+
+            assert!(!r10_20.contains(20));
+            assert!(!r10_20.contains(5));
+            assert!(!r10_20.contains(25));
+        }
+
+        #[test]
+        fn intersects() {
+            let r10_20 = Range::create(10, 20);
+            let r20_25 = Range::create(20, 25);
+            let r15_25 = Range::create(15, 25);
+            let r12_16 = Range::create(12, 16);
+            let r0_1 = Range::create(0, 1);
+
+            assert_eq!(r10_20.intersect(r15_25), Some(Range::create(15, 20)));
+            assert_eq!(r10_20.intersect(r20_25), None);
+            assert_eq!(r20_25.intersect(r10_20), None);
+            assert_eq!(r10_20.intersect(r12_16), Some(r12_16));
+            assert_eq!(r10_20.intersect(r0_1), None);
+            assert_eq!(r15_25.intersect(r12_16), Some(Range::create(15, 16)));
+            assert_eq!(r0_1.intersect(r12_16), None);
+        }
+
+        #[test]
+        fn difference() {
+            let r10_20 = Range::create(10, 20);
+            let r15_20 = Range::create(15, 20);
+            let r15_25 = Range::create(15, 25);
+            let r12_16 = Range::create(12, 16);
+            let r0_1 = Range::create(0, 1);
+
+            assert_eq!(r10_20.difference(r15_25), Difference::One(Range::create(10, 15)));
+            assert_eq!(r15_25.difference(r10_20), Difference::One(Range::create(20, 25)));
+
+            assert_eq!(r10_20.difference(r15_20), Difference::One(Range::create(10, 15)));
+            assert_eq!(r15_20.difference(r10_20), Difference::None);
+
+            assert_eq!(r10_20.difference(r12_16), Difference::Two(Range::create(10, 12), Range::create(16, 20)));
+            assert_eq!(r12_16.difference(r10_20), Difference::None);
+
+            assert_eq!(r10_20.difference(r0_1), Difference::One(r10_20));
+            assert_eq!(r0_1.difference(r10_20), Difference::One(r0_1));
+
+            assert_eq!(r15_20.difference(r15_25), Difference::None);
+            assert_eq!(r15_25.difference(r15_20), Difference::One(Range::create(20, 25)));
+
+            assert_eq!(r15_25.difference(r12_16), Difference::One(Range::create(16, 25)));
+            assert_eq!(r12_16.difference(r15_25), Difference::One(Range::create(12, 15)));
+
+
+
+        // Unexpected split, Range { start: 1, end: 4001 }-Range { start: 2382, end: 4001 }
+            // (Range { start: 1, end: 2382 },Range { start: 4001, end: 4001 }
+        }
     }
 }
