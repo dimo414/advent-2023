@@ -40,7 +40,7 @@ impl Tower {
         let mut bricks = BTreeMap::new();
         for (i, brick) in all_bricks.into_iter().enumerate() {
             let brick = Brick::create(i+1, brick);
-            bricks.entry(brick.z_top).or_insert_with(|| HashSet::new()).insert(brick);
+            bricks.entry(brick.z_top).or_insert_with(HashSet::new).insert(brick);
         }
         Tower{ bricks, supported_by: HashMap::new(), supports: HashMap::new() }
     }
@@ -50,7 +50,7 @@ impl Tower {
         let all_bricks = self.bricks.values().flat_map(|s| s.iter())
             .filter(|b| b.id != id);
         for brick in all_bricks {
-            bricks.entry(brick.z_top).or_insert_with(|| HashSet::new()).insert(brick.clone());
+            bricks.entry(brick.z_top).or_insert_with(HashSet::new).insert(*brick);
         }
         Tower{ bricks, supported_by: HashMap::new(), supports: HashMap::new() }
     }
@@ -64,7 +64,7 @@ impl Tower {
 
         for (k, v) in &self.supported_by {
             for v in v {
-                self.supports.entry(*v).or_insert_with(|| Vec::new()).push(*k);
+                self.supports.entry(*v).or_default().push(*k);
             }
         }
 
@@ -74,12 +74,12 @@ impl Tower {
     // Important: this assumes all bricks below row are in their final positions
     fn descend_row(&mut self, row: i32) -> usize {
         let mut moved = 0;
-        let bricks = self.bricks.remove(&row).unwrap_or_else(|| HashSet::new());
+        let bricks = self.bricks.remove(&row).unwrap_or_default();
         for mut brick in bricks {
             debug_assert_eq!(brick.z_top, row);
             self.descend_brick(&mut brick);
             if brick.z_top != row { moved += 1; }
-            self.bricks.entry(brick.z_top).or_insert_with(|| HashSet::new()).insert(brick);
+            self.bricks.entry(brick.z_top).or_default().insert(brick);
         }
         moved
     }
@@ -149,11 +149,8 @@ impl Tower {
             if let Some(supports) = self.supports.get(&cur) {
                 for supported in supports {
                     let supported_by = self.supported_by.get(supported).expect("Is supported");
-                    if supported_by.iter().all(|b| removed.contains(b)) {
-                        if removed.insert(*supported) {
-                            frontier.push_back(*supported);
-                        }
-                    } else {
+                    if supported_by.iter().all(|b| removed.contains(b)) && removed.insert(*supported) {
+                        frontier.push_back(*supported);
                     }
                 }
             }

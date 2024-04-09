@@ -51,13 +51,14 @@ fn steps_to_all(dirs: &str, paths: &HashMap<String, (String, String)>) -> u64 {
     let n = curs.len();
     let mut steps = 0;
     for dir in dirs.chars().cycle() {
-        for i in 0..n {
-            let (left, right) = paths.get(curs[i]).expect("Not in map");
-            curs[i] = match dir {
+        for item in curs.iter_mut().take(n) {
+            let (left, right) = paths.get(*item).expect("Not in map");
+            let mut next = match dir {
                 'L' => left,
                 'R' => right,
                 _ => panic!(),
             };
+            std::mem::swap(item, &mut next);
         }
         steps += 1;
         if curs.iter().all(|n| n.ends_with('Z')) {

@@ -26,8 +26,8 @@ impl FromStr for Op {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if s.ends_with('-') {
-            Ok(Op::Rm(s[..s.len()-1].to_string()))
+        if let Some(s) = s.strip_suffix('-') {
+           Ok(Op::Rm(s.to_string()))
         } else {
             let (s, f) = s.split('=').collect_tuple().context("Invalid")?;
             ensure!(!s.is_empty());

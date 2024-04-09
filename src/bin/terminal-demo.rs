@@ -5,7 +5,7 @@ fn main() {
     let _drop = Terminal::init();
 
     let args = std::env::args().skip(1).collect::<Vec<_>>();
-    match args.get(0) {
+    match args.first() {
         Some(name) => {
             match name.as_str() {
                 "expand" => expand(&args[1..]),
@@ -24,7 +24,7 @@ fn main() {
     }
 
     fn expand(args: &[String]) {
-        let n = args.get(0).map(|a| a.parse().expect("Invalid num")).unwrap_or(50);
+        let n = args.first().map(|a| a.parse().expect("Invalid num")).unwrap_or(50);
         for i in (0..=n).chain((0..n).rev()) {
             let start = Instant::now();
             let mut print = i.to_string();

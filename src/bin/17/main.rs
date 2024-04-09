@@ -95,7 +95,7 @@ impl<'a> Graph for Crucible<'a> {
     fn neighbors(&self, source: &Self::Node) -> Vec<Edge<Self::Node>> {
         let (pos, dir) = source;
         let dest_to_edge = |(dest, dir): Self::Node| self.map.path_cost(*pos, dest)
-            .map(|c| Edge::new(c, source.clone(), (dest, dir)));
+            .map(|c| Edge::new(c, *source, (dest, dir)));
 
         if *dir == Vector::ZERO {
             // Crucible is not moving (i.e it must be at the start); allow it to go in all directions

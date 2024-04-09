@@ -15,6 +15,12 @@ fn main() -> Result<()> {
     let high = input.counts[&Pulse::High];
     println!("Pulses (low:{} high:{}): {}", low, high, low * high);
 
+    // Nice visualization of the input:
+    // https://old.reddit.com/r/adventofcode/comments/18mypla/2023_day_20_input_data_plot/
+    // There's not really much to be done beyond assuming there are four cycles and waiting for
+    // them to complete. We could traverse from rx to find the cycling nodes, but we'd still have to
+    // assume it's the grandparent nodes that need to be watched, and it doesn't feel particularly
+    // valuable to treat that as variable given that we're assuming the graph is so structured.
     while input.conjunction_cycles().iter().filter(|&&c| c > 1).count() < 4 {
         input.press_button()?;
     }
@@ -25,7 +31,7 @@ fn main() -> Result<()> {
 
 // Borrowed from Day 8, opting not to generalize atm
 fn fold_lcm(inputs: impl IntoIterator<Item=u64>) -> u64 {
-    inputs.into_iter().fold(1, |lcm,v| num::integer::lcm(lcm, v))
+    inputs.into_iter().fold(1, num::integer::lcm)
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -148,7 +154,7 @@ impl Configuration {
     #[cfg(test)]
     fn output(&self) -> &[Vec<Pulse>] {
         if let Some(Module::Output(output)) = self.modules.get(&self.output) {
-            &output
+            output
         } else { panic!("Missing/invalid output module") }
     }
 }
@@ -186,7 +192,7 @@ impl FromStr for Configuration {
                 _ => bail!("Invalid marker {}", marker),
             }?;
 
-            let dests: Vec<_> = dests.split(", ").map(|s| intern(s)).collect();
+            let dests: Vec<_> = dests.split(", ").map(&mut intern).collect();
             for d in dests.iter() {
                 source.entry(d.clone()).or_insert_with(Vec::new).push(name.clone());
             }

@@ -157,8 +157,8 @@ mod tests {
         let mut sets = DisjointSet::create([1, 2, 3, 4, 5, 6, 7 ,8]);
         assert_eq!(sets.roots().len(), 8);
         assert_eq!(sets.set_size(&1), 1);
-        assert_eq!(sets.union(&1, &8), true);
-        assert_eq!(sets.union(&1, &8), false);
+        assert!(sets.union(&1, &8));
+        assert!(!sets.union(&1, &8));
         assert_eq!(sets.set_size(&1), 2);
         assert_eq!(sets.set_size(&8), 2);
         assert_eq!(sets.set_size(&2), 1);
